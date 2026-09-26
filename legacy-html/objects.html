@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Object Field</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    body {
+      background: #fff;
+      color: #111;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    body.is-pressing canvas {
+      cursor: grabbing;
+    }
+
+    .loading {
+      position: fixed;
+      z-index: 2;
+      pointer-events: none;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: #fff;
+      color: #111;
+      text-transform: uppercase;
+      font-size: 11px;
+      line-height: 1;
+      transition: opacity .45s ease;
+    }
+
+    .loading.is-hidden {
+      opacity: 0;
+    }
+
+    .progress {
+      width: 72px;
+      height: 1px;
+      margin-top: 10px;
+      background: #d2d2ce;
+      overflow: hidden;
+    }
+
+    .progress::after {
+      content: "";
+      display: block;
+      width: var(--progress, 0%);
+      height: 100%;
+      background: #111;
+      transition: width .2s ease;
+    }
+
+    .team-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 3;
+      width: min(270px, calc(100vw - 32px));
+      padding: 18px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.359);
+      color: #111;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate3d(0, 0, 0);
+      transition: opacity .16s ease;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .team-panel.is-open {
+      opacity: 1;
+    }
+
+    .team-panel__team {
+      margin: 0 0 10px;
+      font-size: 13px;
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .team-panel__media {
+      margin: 0 0 12px;
+      font-size: 12px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+
+    .team-panel__description {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.55;
+      font-weight: 400;
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+
+<body>
+  <div class="loading" id="loading">
+    <div>Loading objects<div class="progress" id="progress"></div>
+    </div>
+  </div>
+  <div class="team-panel" id="teamPanel" aria-hidden="true">
+    <p class="team-panel__team" id="teamPanelTeam"></p>
+    <p class="team-panel__media" id="teamPanelMedia"></p>
+    <p class="team-panel__description" id="teamPanelDescription"></p>
+  </div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+    import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+
+    const camera = new THREE.OrthographicCamera(-6, 6, 6, -6, .1, 60);
+    camera.position.set(0, 0, 12);
+    const cameraTarget = new THREE.Vector3();
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+    document.body.prepend(renderer.domElement);
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture;
+    scene.environmentIntensity = 1.25;
+    pmrem.dispose();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xdad7cf, 1.65));
+    const key = new THREE.DirectionalLight(0xffffff, 2.25);
+    key.position.set(4, 6, 8);
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xb6d4ff, 1.1);
+    rim.position.set(-5, -2, 5);
+    scene.add(rim);
+
+    const world = new THREE.Group();
+    scene.add(world);
+    const dynamic = [];
+    const raycastTargets = [];
+    const pointer = new THREE.Vector2();
+    const pointerWorld = new THREE.Vector3();
+    const raycaster = new THREE.Raycaster();
+    const clock = new THREE.Clock();
+    let carouselAngle = Math.PI * .06;
+    const gltfLoader = new GLTFLoader();
+    const textureLoader = new THREE.TextureLoader();
+    const loading = document.querySelector("#loading");
+    const progress = document.querySelector("#progress");
+    let loaded = 0;
+    const teamPanel = document.querySelector("#teamPanel");
+    const teamPanelTeam = document.querySelector("#teamPanelTeam");
+    const teamPanelMedia = document.querySelector("#teamPanelMedia");
+    const teamPanelDescription = document.querySelector("#teamPanelDescription");
+    const teamInfo = [
+      { team: "TEAM. 000000", media: "신규 콘텐츠 · 서비스", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "브랜드 캠페인 · 영상", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "디지털 제품 · 플랫폼", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "전시 · 인터랙션", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "커뮤니티 · 미디어", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "리서치 · 아카이브", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "서비스 · 콘텐츠", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "이벤트 · 프로모션", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "데이터 · 시각화", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "콘텐츠 스튜디오", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "프로토타입 · R&D", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "소셜 콘텐츠 · 운영", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM.000000", media: "편집 · 디자인", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "음악 · 퍼포먼스", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "웹 · 인터랙티브", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. 000000", media: "서비스 소개 · 운영", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." },
+      { team: "TEAM. Quiet Wave", media: "신규 콘텐츠 · 서비스", description: "콘텐츠 관련 설명이 들어가는 자리입니다. 서비스 소개 내용을 자유롭게 수정할 수 있습니다." }
+    ];
+    let selectedTeamBody = null;
+    const teamPanelWorldPosition = new THREE.Vector3();
+    const teamPanelScreenPosition = new THREE.Vector3();
+
+    const seeds = [
+      [-3.65, 2.25, -.7], [-1.45, 2.65, .5], [1.2, 2.5, -.15], [3.6, 2.0, .8],
+      [-4.2, .1, .5], [-2.25, .45, -1], [2.35, .55, -.75], [4.2, -.15, .3],
+      [-3.55, -2.15, -.45], [-1.4, -2.5, .85], [1.35, -2.45, -.85], [3.7, -2.1, .65],
+      [-.2, 3.75, -1], [-.1, -3.65, .5], [-4.85, -1.05, -.65], [4.9, 1.05, -.45]
+    ];
+    const assetPath = "./assets/";
+    const modelFiles = ["shape.glb", "cone.glb", "capsulel.glb", "cube.glb", "bag.glb", "car.glb", "snekars.glb"];
+    const imageFiles = Array.from({ length: 10 }, (_, i) => `image ${1300 + i}.webp`);
+    const totalAssets = modelFiles.length + imageFiles.length;
+
+    function random(seed) {
+      const n = Math.sin(seed * 127.1 + 311.7) * 43758.5453123;
+      return n - Math.floor(n);
+    }
+
+    function markLoaded() {
+      loaded += 1;
+      progress.style.setProperty("--progress", `${loaded / totalAssets * 100}%`);
+      if (loaded === totalAssets) {
+        setTimeout(() => {
+          loading.classList.add("is-hidden");
+          setTimeout(() => loading.remove(), 500);
+        }, 300);
+      }
+    }
+
+    function fitObject(object, targetSize) {
+      const box = new THREE.Box3().setFromObject(object);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const scale = targetSize / Math.max(size.x, size.y, size.z, .001);
+      object.position.sub(center);
+      object.scale.setScalar(scale);
+      object.updateMatrixWorld(true);
+    }
+
+    const materialHoldDuration = 3.2;
+    const materialTransitionDuration = 2.8;
+    const materialStageDuration = materialHoldDuration + materialTransitionDuration;
+    const materialCycleDuration = materialStageDuration * 4;
+    const materialFeatureFloor = .00001;
+    let materialCycleStart = 0;
+    const materialStates = [
+      { tint: new THREE.Color(0xf2f1ed), base: 1, roughness: .82, metalness: .02, transmission: 0, clearcoat: 0, clearcoatRoughness: .2, envMapIntensity: .65, iridescence: 0, sheen: 0, hologram: 0, thickness: .1, ior: 1.5, dispersion: 0 },
+      { tint: new THREE.Color(0x89929d), base: 0, roughness: .045, metalness: 1, transmission: 0, clearcoat: 1, clearcoatRoughness: .015, envMapIntensity: 3.2, iridescence: 0, sheen: 0, hologram: 0, thickness: .1, ior: 1.5, dispersion: 0 },
+      { tint: new THREE.Color(0xffffff), base: 0, roughness: .09, metalness: .28, transmission: 0, clearcoat: 1, clearcoatRoughness: .02, envMapIntensity: 2.15, iridescence: 1, sheen: 1, hologram: 1, thickness: .1, ior: 1.5, dispersion: 0 },
+      { tint: new THREE.Color(0xf7fdff), base: 0, roughness: .01, metalness: 0, transmission: 1, clearcoat: 1, clearcoatRoughness: .01, envMapIntensity: 3, iridescence: 0, sheen: 0, hologram: 0, thickness: 1.2, ior: 1.52, dispersion: .06 }
+    ];
+
+    function smootherstep(value) {
+      const x = THREE.MathUtils.clamp(value, 0, 1);
+      return x * x * x * (x * (x * 6 - 15) + 10);
+    }
+
+    function transitionalMaterial(defaultMaterial) {
+      const uniforms = {
+        surfaceTint: { value: new THREE.Color(0xf2f1ed) },
+        baseInfluence: { value: 1 },
+        hologramIntensity: { value: 0 }
+      };
+      const material = new THREE.MeshPhysicalMaterial({
+        color: defaultMaterial.color?.clone() || new THREE.Color(0xf2f1ed),
+        map: defaultMaterial.map || null,
+        normalMap: defaultMaterial.normalMap || null,
+        roughness: .82, metalness: .02, transmission: materialFeatureFloor,
+        thickness: .1, ior: 1.5, dispersion: materialFeatureFloor,
+        transparent: true, opacity: 1, depthWrite: false,
+        clearcoat: materialFeatureFloor, clearcoatRoughness: .2,
+        iridescence: materialFeatureFloor, iridescenceIOR: 2.2, iridescenceThicknessRange: [100, 1200],
+        sheen: materialFeatureFloor, sheenColor: new THREE.Color(0xff45df), sheenRoughness: .18,
+        specularIntensity: 1, specularColor: new THREE.Color(0xffffff),
+        attenuationColor: new THREE.Color(0xf5fcff), attenuationDistance: 8,
+        envMapIntensity: .65, side: THREE.DoubleSide
+      });
+      material.userData.transitionUniforms = uniforms;
+      material.onBeforeCompile = shader => {
+        Object.assign(shader.uniforms, {
+          uSurfaceTint: uniforms.surfaceTint,
+          uBaseInfluence: uniforms.baseInfluence,
+          uHologramIntensity: uniforms.hologramIntensity
+        });
+        shader.fragmentShader = `
+          uniform vec3 uSurfaceTint;
+          uniform float uBaseInfluence;
+          uniform float uHologramIntensity;
+        ` + shader.fragmentShader;
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <normal_fragment_maps>",
+          `#include <normal_fragment_maps>
+          diffuseColor.rgb = mix(uSurfaceTint, diffuseColor.rgb, uBaseInfluence);
+          vec3 holoView = normalize(vViewPosition);
+          float holoFresnel = pow(1.0 - abs(dot(normalize(normal), holoView)), 1.35);
+          float holoPhase = holoFresnel * 1.9 + normal.x * .34 + normal.y * .23 + normal.z * .13;
+          vec3 holoSpectrum = .52 + .48 * cos(6.2831853 * (holoPhase + vec3(0.0, .33, .67)));
+          vec3 holoSecondary = .52 + .48 * cos(6.2831853 * (holoPhase * 1.73 + vec3(.12, .45, .78)));
+          vec3 holoColor = mix(holoSpectrum, holoSecondary, .32);
+          diffuseColor.rgb = mix(diffuseColor.rgb, holoColor, uHologramIntensity * .88);`
+        );
+      };
+      material.customProgramCacheKey = () => "continuous-material-transition-v1";
+      return material;
+    }
+
+    function updateMaterialTransition(body, elapsed) {
+      let stageTime = (elapsed - materialCycleStart + body.index * materialStageDuration) % materialCycleDuration;
+      let fromIndex = 0;
+      while (stageTime >= materialStageDuration) {
+        stageTime -= materialStageDuration;
+        fromIndex += 1;
+      }
+      const toIndex = (fromIndex + 1) % materialStates.length;
+      const progress = stageTime <= materialHoldDuration
+        ? 0
+        : smootherstep((stageTime - materialHoldDuration) / materialTransitionDuration);
+      const from = materialStates[fromIndex];
+      const to = materialStates[toIndex];
+
+      for (const material of body.materials) {
+        const uniforms = material.userData.transitionUniforms;
+        uniforms.surfaceTint.value.copy(from.tint).lerp(to.tint, progress);
+        uniforms.baseInfluence.value = THREE.MathUtils.lerp(from.base, to.base, progress);
+        uniforms.hologramIntensity.value = THREE.MathUtils.lerp(from.hologram, to.hologram, progress);
+        material.roughness = THREE.MathUtils.lerp(from.roughness, to.roughness, progress);
+        material.metalness = THREE.MathUtils.lerp(from.metalness, to.metalness, progress);
+        material.transmission = Math.max(materialFeatureFloor, THREE.MathUtils.lerp(from.transmission, to.transmission, progress));
+        material.clearcoat = Math.max(materialFeatureFloor, THREE.MathUtils.lerp(from.clearcoat, to.clearcoat, progress));
+        material.clearcoatRoughness = THREE.MathUtils.lerp(from.clearcoatRoughness, to.clearcoatRoughness, progress);
+        material.envMapIntensity = THREE.MathUtils.lerp(from.envMapIntensity, to.envMapIntensity, progress);
+        material.iridescence = Math.max(materialFeatureFloor, THREE.MathUtils.lerp(from.iridescence, to.iridescence, progress));
+        material.sheen = Math.max(materialFeatureFloor, THREE.MathUtils.lerp(from.sheen, to.sheen, progress));
+        material.thickness = THREE.MathUtils.lerp(from.thickness, to.thickness, progress);
+        material.ior = THREE.MathUtils.lerp(from.ior, to.ior, progress);
+        material.dispersion = Math.max(materialFeatureFloor, THREE.MathUtils.lerp(from.dispersion, to.dispersion, progress));
+      }
+    }
+
+    const desktopAnchors = [
+      [-.88, .82], [-.38, .72], [.16, .84], [.62, .7],
+      [.88, .36], [-.72, .34], [-.18, .25], [.34, .38],
+      [.76, -.05], [-.86, -.12], [-.42, -.35], [.1, -.2],
+      [.56, -.42], [.88, -.68], [-.58, -.78], [.18, -.8], [-.08, .58]
+    ];
+    const mobileAnchors = [
+      [-.78, .86], [0, .78], [.78, .88], [-.62, .5],
+      [.25, .45], [.82, .38], [-.84, .12], [-.15, .08],
+      [.62, .02], [-.68, -.26], [.16, -.3], [.82, -.2],
+      [-.82, -.58], [-.08, -.62], [.68, -.55], [0, -.86], [.42, .7]
+    ];
+    const anchorOrder = [0, 3, 8, 12, 15, 5, 1, 2, 4, 6, 7, 9, 10, 11, 13, 14, 16];
+    function screenAnchor(index) {
+      const anchor = (innerWidth < 640 ? mobileAnchors : desktopAnchors)[anchorOrder[index]];
+      return new THREE.Vector2(anchor[0], anchor[1]);
+    }
+
+    const cameraForward = new THREE.Vector3();
+    const cameraRight = new THREE.Vector3();
+    const cameraScreenUp = new THREE.Vector3();
+    function distributedTarget(body, elapsed = 0) {
+      const anchor = screenAnchor(body.index);
+      const halfWidth = (camera.right - camera.left) * .5;
+      const halfHeight = (camera.top - camera.bottom) * .5;
+      const safeX = Math.max(.65, halfWidth - body.radius * .82);
+      const safeY = Math.max(1, halfHeight - body.radius * .42);
+      const orbitPhase = body.phase + carouselAngle;
+      const driftX = Math.sin(elapsed * .22 + body.phase) * .16;
+      const driftY = Math.cos(elapsed * .19 + body.phase * 1.37) * .18;
+      const laneX = anchor.x * safeX;
+      const laneY = anchor.y * safeY;
+      const orbitX = Math.cos(orbitPhase * 1.13 + body.index * .17) * Math.min(.34, safeX * .075);
+      const orbitY = Math.sin(orbitPhase) * safeY * .14;
+      const depth = Math.cos(orbitPhase) * (innerWidth < 640 ? 2.8 : 3.35);
+
+      camera.getWorldDirection(cameraForward);
+      cameraRight.crossVectors(cameraForward, camera.up).normalize();
+      cameraScreenUp.copy(camera.up).normalize();
+      return cameraRight.clone().multiplyScalar(laneX + orbitX + driftX)
+        .addScaledVector(cameraScreenUp, laneY + orbitY + driftY)
+        .addScaledVector(cameraForward, depth);
+    }
+
+    function addBody(object, position, radius, index, type, materials = []) {
+      const axis = new THREE.Vector3(random(index + 2) - .5, random(index + 5) - .5, random(index + 9) - .5).normalize();
+      const angle = random(index + 20) * Math.PI * 2;
+      const baseAngular = axis.multiplyScalar(.065 + random(index + 41) * .075);
+      const anchor = screenAnchor(index);
+      const phase = random(index + 51) * Math.PI * 2;
+      const viewHeight = innerWidth < 640 ? 11.2 : 8.3;
+      const halfWidth = viewHeight * (innerWidth / innerHeight) * .5;
+      const radialLimit = Math.max(.8, viewHeight * .5 - radius * .9);
+      const startRadius = radialLimit * (.42 + random(index + 61) * .5);
+      const initialSpeed = .1 + random(index + 67) * .1;
+      const startPosition = new THREE.Vector3(
+        anchor.x * Math.max(.7, halfWidth - radius),
+        Math.sin(phase) * startRadius,
+        Math.cos(phase) * startRadius
+      );
+      const body = {
+        object, position: startPosition, velocity: new THREE.Vector3(Math.cos(angle), Math.sin(angle), random(index + 31) - .5).normalize().multiplyScalar(initialSpeed),
+        angular: baseAngular.clone(), baseAngular, radius, mass: .75 + radius,
+        index, type, materials, phase,
+        trailLag: Math.round(2 + index * 2.6 + random(index + 58) * 4),
+        cruiseX: (random(index + 70) > .5 ? 1 : -1) * (.14 + random(index + 72) * .12),
+        orbitDirection: index % 2 === 0 ? 1 : -1,
+        orbitSpeed: .2 + random(index + 75) * .16,
+        spriteSpin: (random(index + 74) > .5 ? 1 : -1) * (.07 + random(index + 77) * .09),
+        baseScale: object.scale.clone(), hit: 0, pressScale: 1, throwUntil: 0
+      };
+      object.position.copy(body.position);
+      object.userData.body = body;
+      object.traverse(child => { if (child.isMesh || child.isSprite) { child.userData.body = body; raycastTargets.push(child); } });
+      dynamic.push(body);
+      return body;
+    }
+
+    async function loadModel(file, index) {
+      try {
+        const gltf = await gltfLoader.loadAsync(`${assetPath}${file}`);
+        const shell = new THREE.Group();
+        const model = gltf.scene;
+        const responsiveScale = innerWidth < 640 ? .6 : 1;
+        const targetSize = (file === "bag.glb" ? 3.2 : 2.6 + random(index) * .9) * responsiveScale;
+        fitObject(model, targetSize);
+        shell.add(model);
+        const materials = [];
+        model.traverse(child => {
+          if (!child.isMesh) return;
+          const current = Array.isArray(child.material) ? child.material : [child.material];
+          const next = current.map(material => transitionalMaterial(material));
+          current.forEach(material => material.dispose());
+          child.material = next.length === 1 ? next[0] : next;
+          materials.push(...next);
+        });
+        world.add(shell);
+        addBody(shell, seeds[index], targetSize * .52, index, "model", materials);
+      } catch (error) { console.error(file, error); }
+      markLoaded();
+    }
+
+    async function loadImage(file, imageIndex) {
+      const index = imageIndex + modelFiles.length;
+      try {
+        const texture = await textureLoader.loadAsync(`${assetPath}${file}`);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+        const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, alphaTest: .025, toneMapped: false });
+        const sprite = new THREE.Sprite(material);
+        const responsiveScale = innerWidth < 640 ? .6 : 1;
+        const size = (2.95 + random(index) * 1.3) * responsiveScale;
+        const width = texture.image.naturalWidth || texture.image.width;
+        const height = texture.image.naturalHeight || texture.image.height;
+        const aspect = width / height;
+        sprite.scale.set(aspect >= 1 ? size : size * aspect, aspect >= 1 ? size / aspect : size, 1);
+        world.add(sprite);
+        addBody(sprite, seeds[index], size * .5, index, "sprite", [material]);
+      } catch (error) { console.error(file, error); }
+      markLoaded();
+    }
+
+    await Promise.all([
+      ...modelFiles.map((file, index) => loadModel(file, index)),
+      ...imageFiles.map((file, index) => loadImage(file, index))
+    ]);
+    materialCycleStart = clock.elapsedTime;
+
+    const pointerPlane = new THREE.Plane();
+    const safePointer = new THREE.Vector2();
+    function refreshPointerWorld() {
+      const safeX = innerWidth < 640 ? .34 : .72;
+      safePointer.set(
+        THREE.MathUtils.clamp(pointer.x, -safeX, safeX),
+        THREE.MathUtils.clamp(pointer.y, -.68, .68)
+      );
+      raycaster.setFromCamera(safePointer, camera);
+      camera.getWorldDirection(cameraForward);
+      pointerPlane.setFromNormalAndCoplanarPoint(cameraForward, cameraTarget);
+      raycaster.ray.intersectPlane(pointerPlane, pointerWorld);
+      world.worldToLocal(pointerWorld);
+    }
+
+    function updatePointer(event) {
+      pointer.x = event.clientX / innerWidth * 2 - 1;
+      pointer.y = -(event.clientY / innerHeight) * 2 + 1;
+      refreshPointerWorld();
+    }
+
+    const pointerTrail = [];
+    const dragPoint = new THREE.Vector3();
+    const input = {
+      down: false, scrollPower: 0, hoverX: 0, hoverY: 0,
+      releaseBoostUntil: 0, scrollPauseUntil: 0, physicsBlend: 1, autoDirection: 1,
+      dragBody: null, dragPlane: new THREE.Plane(), dragOffset: new THREE.Vector3(),
+      dragTarget: new THREE.Vector3(), dragLast: new THREE.Vector3(), dragLastTime: 0,
+      dragStartX: 0, dragStartY: 0, dragMoved: false
+    };
+
+    function updateDirectDrag(event) {
+      if (!input.dragBody) return;
+      raycaster.setFromCamera(pointer, camera);
+      if (!raycaster.ray.intersectPlane(input.dragPlane, dragPoint)) return;
+      world.worldToLocal(dragPoint);
+      input.dragTarget.copy(dragPoint).add(input.dragOffset);
+      const dt = Math.max((event.timeStamp - input.dragLastTime) / 1000, 1 / 120);
+      input.dragBody.velocity.copy(input.dragTarget).sub(input.dragLast).multiplyScalar(.32 / dt);
+      if (input.dragBody.velocity.length() > 7.5) input.dragBody.velocity.setLength(7.5);
+      input.dragBody.position.copy(input.dragTarget);
+      input.dragBody.object.position.copy(input.dragBody.position);
+      input.dragLast.copy(input.dragTarget);
+      input.dragLastTime = event.timeStamp;
+      input.dragMoved ||= Math.hypot(event.clientX - input.dragStartX, event.clientY - input.dragStartY) > 6;
+    }
+
+    function closeTeamPanel() {
+      selectedTeamBody = null;
+      teamPanel.classList.remove("is-open");
+      teamPanel.setAttribute("aria-hidden", "true");
+    }
+
+    function toggleTeamPanel(body) {
+      if (!body || !teamInfo[body.index]) return closeTeamPanel();
+      if (selectedTeamBody === body) {
+        closeTeamPanel();
+        return;
+      }
+      const info = teamInfo[body.index];
+      selectedTeamBody = body;
+      teamPanelTeam.textContent = info.team;
+      teamPanelMedia.textContent = info.media;
+      teamPanelDescription.textContent = info.description;
+      teamPanel.classList.add("is-open");
+      teamPanel.setAttribute("aria-hidden", "false");
+      updateTeamPanelPosition();
+    }
+
+    function updateTeamPanelPosition() {
+      if (!selectedTeamBody) return;
+      teamPanelWorldPosition.copy(selectedTeamBody.position);
+      world.localToWorld(teamPanelWorldPosition);
+      teamPanelScreenPosition.copy(teamPanelWorldPosition).project(camera);
+      const x = (teamPanelScreenPosition.x * .5 + .5) * innerWidth;
+      const y = (-teamPanelScreenPosition.y * .5 + .5) * innerHeight;
+      const gap = innerWidth < 640 ? 20 : 26;
+      const margin = 16;
+      const rect = teamPanel.getBoundingClientRect();
+      const panelWidth = rect.width || Math.min(270, innerWidth - margin * 2);
+      const panelHeight = rect.height || 120;
+      const placeRight = x < innerWidth * .5;
+      let left = placeRight ? x + gap : x - panelWidth - gap;
+      let top = y - panelHeight * .5;
+      left = THREE.MathUtils.clamp(left, margin, innerWidth - panelWidth - margin);
+      top = THREE.MathUtils.clamp(top, margin, innerHeight - panelHeight - margin);
+      teamPanel.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+    }
+
+    renderer.domElement.addEventListener("pointerdown", event => {
+      updatePointer(event);
+      input.down = true;
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(raycastTargets, false)[0];
+      input.dragBody = hit?.object.userData.body || null;
+      input.dragStartX = event.clientX;
+      input.dragStartY = event.clientY;
+      input.dragMoved = false;
+      pointerTrail.length = 0;
+      if (Number.isFinite(event.pointerId)) renderer.domElement.setPointerCapture(event.pointerId);
+      document.body.classList.add("is-pressing");
+      if (input.dragBody) {
+        camera.getWorldDirection(cameraForward);
+        const bodyWorldPosition = world.localToWorld(input.dragBody.position.clone());
+        input.dragPlane.setFromNormalAndCoplanarPoint(cameraForward, bodyWorldPosition);
+        raycaster.ray.intersectPlane(input.dragPlane, dragPoint);
+        world.worldToLocal(dragPoint);
+        input.dragOffset.copy(input.dragBody.position).sub(dragPoint);
+        input.dragTarget.copy(input.dragBody.position);
+        input.dragLast.copy(input.dragBody.position);
+        input.dragLastTime = event.timeStamp;
+        input.dragBody.velocity.set(0, 0, 0);
+        return;
+      }
+      for (let i = 0; i < 72; i++) pointerTrail.push(pointerWorld.clone());
+      for (const body of dynamic) {
+        const towardPointer = pointerWorld.clone().sub(body.position);
+        if (towardPointer.lengthSq() > .001) body.velocity.add(towardPointer.normalize().multiplyScalar(3.5));
+      }
+    });
+    renderer.domElement.addEventListener("pointermove", event => {
+      updatePointer(event);
+      input.hoverX = pointer.x;
+      input.hoverY = pointer.y;
+      input.dragMoved ||= input.down && Math.hypot(event.clientX - input.dragStartX, event.clientY - input.dragStartY) > 6;
+      updateDirectDrag(event);
+    });
+    function release(event) {
+      if (!input.down) return;
+      updatePointer(event);
+      if (input.dragBody) {
+        updateDirectDrag(event);
+        const body = input.dragBody;
+        input.down = false;
+        input.dragBody = null;
+        pointerTrail.length = 0;
+        document.body.classList.remove("is-pressing");
+        if (!input.dragMoved) {
+          body.velocity.set(0, 0, 0);
+          toggleTeamPanel(body);
+        } else {
+          body.throwUntil = clock.elapsedTime + .7;
+        }
+        return;
+      }
+      input.down = false;
+      input.releaseBoostUntil = clock.elapsedTime + 1.15;
+      pointerTrail.length = 0;
+      document.body.classList.remove("is-pressing");
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(raycastTargets, false)[0];
+      if (!input.dragMoved && !hit) closeTeamPanel();
+      camera.getWorldDirection(cameraForward);
+      cameraRight.crossVectors(cameraForward, camera.up).normalize();
+      cameraScreenUp.copy(camera.up).normalize();
+      for (const body of dynamic) {
+        const towardRest = distributedTarget(body, clock.elapsedTime).sub(body.position).normalize();
+        const spreadAngle = body.index / dynamic.length * Math.PI * 2;
+        const radial = cameraRight.clone().multiplyScalar(Math.cos(spreadAngle))
+          .addScaledVector(cameraScreenUp, Math.sin(spreadAngle))
+          .addScaledVector(cameraForward, (random(body.index + 63) - .5) * .32)
+          .normalize();
+        const direction = towardRest.multiplyScalar(.78).add(radial.multiplyScalar(.22)).normalize();
+        const strength = (hit?.object.userData.body === body ? 7.8 : 6.1) + random(body.index + 68) * .9;
+        body.velocity.copy(direction.multiplyScalar(strength));
+        body.angular.add(new THREE.Vector3(random(body.index + 71) - .5, random(body.index + 81) - .5, random(body.index + 91) - .5).multiplyScalar(.045));
+        if (body.angular.length() > .24) body.angular.setLength(.24);
+        if (hit?.object.userData.body === body) body.hit = 1;
+      }
+    }
+    renderer.domElement.addEventListener("pointerup", release);
+    renderer.domElement.addEventListener("pointercancel", release);
+    renderer.domElement.addEventListener("wheel", event => {
+      event.preventDefault();
+      input.scrollPauseUntil = performance.now() + 180;
+      let dominant = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX * .75;
+      if (event.deltaMode === 1) dominant *= 16;
+      if (event.deltaMode === 2) dominant *= innerHeight;
+      const wheelPower = THREE.MathUtils.clamp(-dominant / 800, -.5, .5);
+      if (Math.abs(wheelPower) > .0001) input.autoDirection = Math.sign(wheelPower);
+      if (Math.abs(dominant) < 40) {
+        input.scrollPower = THREE.MathUtils.clamp(input.scrollPower + wheelPower, -.5, .5);
+      } else if (wheelPower <= 0) {
+        input.scrollPower = Math.max(Math.min(wheelPower, input.scrollPower), -.5);
+      } else {
+        input.scrollPower = Math.min(Math.max(wheelPower, input.scrollPower), .5);
+      }
+    }, { passive: false });
+
+    function confineToCylinder(body) {
+      const halfWidth = (camera.right - camera.left) * .5;
+      const halfHeight = (camera.top - camera.bottom) * .5;
+      const margin = body.radius * body.pressScale * .96;
+      const limitX = Math.max(.45, halfWidth - margin);
+      const radialLimit = Math.max(.7, halfHeight - margin);
+
+      if (Math.abs(body.position.x) > limitX) {
+        body.position.x = THREE.MathUtils.clamp(body.position.x, -limitX, limitX);
+        if (Math.sign(body.velocity.x) === Math.sign(body.position.x)) {
+          body.velocity.x *= -.58;
+          body.cruiseX *= -1;
+        }
+      }
+
+      const radialDistance = Math.hypot(body.position.y, body.position.z);
+      if (radialDistance > radialLimit) {
+        const normalY = body.position.y / radialDistance;
+        const normalZ = body.position.z / radialDistance;
+        body.position.y = normalY * radialLimit;
+        body.position.z = normalZ * radialLimit;
+        const outwardVelocity = body.velocity.y * normalY + body.velocity.z * normalZ;
+        if (outwardVelocity > 0) {
+          body.velocity.y -= normalY * outwardVelocity * 1.42;
+          body.velocity.z -= normalZ * outwardVelocity * 1.42;
+        }
+      }
+    }
+
+    function simulate(dt, elapsed) {
+      const step = Math.min(dt, 1 / 30);
+      const collisionBlend = Math.min(1, step * 60);
+      const groupPull = input.down && !input.dragBody;
+      if (groupPull) {
+        refreshPointerWorld();
+        pointerTrail.unshift(pointerWorld.clone());
+        if (pointerTrail.length > 80) pointerTrail.length = 80;
+      }
+      camera.getWorldDirection(cameraForward);
+      cameraRight.crossVectors(cameraForward, camera.up).normalize();
+      cameraScreenUp.copy(camera.up).normalize();
+
+      for (const body of dynamic) {
+        if (body === input.dragBody) continue;
+        const wander = new THREE.Vector3(
+          Math.sin(elapsed * .27 + body.phase),
+          Math.cos(elapsed * .23 + body.phase * 1.7),
+          Math.sin(elapsed * .19 + body.phase * .7)
+        ).multiplyScalar(.14 * step);
+        body.velocity.add(wander);
+        if (!groupPull) {
+          const halfWidth = (camera.right - camera.left) * .5;
+          const halfHeight = (camera.top - camera.bottom) * .5;
+          const screenX = body.position.dot(cameraRight);
+          const screenY = body.position.dot(cameraScreenUp);
+          const normalizedX = screenX / Math.max(1, halfWidth * .78);
+          const normalizedY = screenY / Math.max(1, halfHeight * .78);
+          const centerDistance = Math.hypot(normalizedX, normalizedY);
+          if (centerDistance < .58) {
+            const pushAngle = centerDistance > .001 ? Math.atan2(normalizedY, normalizedX) : body.phase;
+            const centerPush = (.58 - centerDistance) * 1.25 * step;
+            body.velocity.addScaledVector(cameraRight, Math.cos(pushAngle) * centerPush);
+            body.velocity.addScaledVector(cameraScreenUp, Math.sin(pushAngle) * centerPush);
+          }
+
+          const radialLength = Math.hypot(body.position.y, body.position.z);
+          if (radialLength > .1) {
+            const tangentY = -body.position.z / radialLength;
+            const tangentZ = body.position.y / radialLength;
+            const currentOrbitSpeed = (body.velocity.y * tangentY + body.velocity.z * tangentZ) * body.orbitDirection;
+            const desiredOrbitSpeed = body.orbitSpeed * (1 + Math.sin(elapsed * .31 + body.phase) * .16);
+            const orbitCorrection = (desiredOrbitSpeed - currentOrbitSpeed) * 1.25 * step * body.orbitDirection;
+            body.velocity.y += tangentY * orbitCorrection;
+            body.velocity.z += tangentZ * orbitCorrection;
+          }
+          const desiredX = body.cruiseX * (1 + Math.sin(elapsed * .27 + body.phase) * .18);
+          body.velocity.x += (desiredX - body.velocity.x) * 1.15 * step;
+        }
+        if (groupPull) {
+          camera.getWorldDirection(cameraForward);
+          cameraRight.crossVectors(cameraForward, camera.up).normalize();
+          cameraScreenUp.copy(camera.up).normalize();
+          const delayedPointer = pointerTrail[Math.min(body.trailLag, pointerTrail.length - 1)] || pointerWorld;
+          const depthSlot = (body.index % 4 - 1.5) * .16;
+          const personalAngle = body.phase + elapsed * (.16 + random(body.index + 149) * .12);
+          const personalRadius = body.radius * (.42 + random(body.index + 153) * .28);
+          const target = delayedPointer.clone()
+            .addScaledVector(cameraRight, Math.cos(personalAngle) * personalRadius)
+            .addScaledVector(cameraScreenUp, Math.sin(personalAngle) * personalRadius)
+            .addScaledVector(cameraForward, depthSlot);
+          const attraction = target.sub(body.position);
+          const responsiveness = 6.5 + random(body.index + 131) * 7.5;
+          body.velocity.addScaledVector(attraction, responsiveness * step);
+        } else {
+          const boosted = elapsed < input.releaseBoostUntil;
+          if (boosted) {
+            const homePull = distributedTarget(body, elapsed).sub(body.position);
+            body.velocity.addScaledVector(homePull, 3.8 * step);
+          }
+        }
+      }
+
+      for (let i = 0; i < dynamic.length; i++) {
+        for (let j = i + 1; j < dynamic.length; j++) {
+          const a = dynamic[i], b = dynamic[j];
+          const delta = b.position.clone().sub(a.position);
+          const minDistance = (a.radius + b.radius) * (groupPull ? (innerWidth < 640 ? .7 : .94) : .86);
+          const distance = delta.length();
+          if (distance < minDistance && distance >= .001) {
+            const normal = delta.clone().multiplyScalar(1 / distance);
+            const overlap = minDistance - distance;
+            const aShare = a === input.dragBody ? 0 : (b === input.dragBody ? 1 : .5);
+            const bShare = b === input.dragBody ? 0 : (a === input.dragBody ? 1 : .5);
+            a.position.addScaledVector(normal, -overlap * aShare * collisionBlend);
+            b.position.addScaledVector(normal, overlap * bShare * collisionBlend);
+            const relative = b.velocity.clone().sub(a.velocity).dot(normal);
+            if (relative < 0) {
+              const impulse = -(1.3 * relative) / (1 / a.mass + 1 / b.mass) * collisionBlend;
+              if (a !== input.dragBody) a.velocity.addScaledVector(normal, -impulse / a.mass);
+              if (b !== input.dragBody) b.velocity.addScaledVector(normal, impulse / b.mass);
+            }
+          }
+
+          const projectedX = delta.dot(cameraRight);
+          const projectedY = delta.dot(cameraScreenUp);
+          const projectedDistance = Math.hypot(projectedX, projectedY);
+          const projectedMinimum = (a.radius + b.radius) * 1.08 + .18;
+          if (projectedDistance > .001 && projectedDistance < projectedMinimum) {
+            const separation = (projectedMinimum - projectedDistance) / projectedMinimum;
+            const screenNormal = cameraRight.clone().multiplyScalar(projectedX / projectedDistance)
+              .addScaledVector(cameraScreenUp, projectedY / projectedDistance);
+            const separationForce = separation * .7 * step;
+            if (a !== input.dragBody) a.velocity.addScaledVector(screenNormal, -separationForce / a.mass);
+            if (b !== input.dragBody) b.velocity.addScaledVector(screenNormal, separationForce / b.mass);
+          }
+
+        }
+      }
+
+      for (const body of dynamic) {
+        if (body === input.dragBody) {
+          body.position.copy(input.dragTarget);
+          confineToCylinder(body);
+          body.object.position.copy(body.position);
+        }
+        const boosted = elapsed < Math.max(input.releaseBoostUntil, body.throwUntil);
+        if (body !== input.dragBody) {
+          body.velocity.multiplyScalar(Math.pow(groupPull ? .968 : (boosted ? .995 : .995), step * 60));
+          const maxSpeed = groupPull ? 11.5 : (boosted ? 8.2 : 1.05);
+          if (body.velocity.length() > maxSpeed) body.velocity.setLength(maxSpeed);
+          body.position.addScaledVector(body.velocity, step);
+          confineToCylinder(body);
+          body.object.position.copy(body.position);
+        }
+        if (body.type === "model") {
+          body.angular.lerp(body.baseAngular, 1 - Math.exp(-3.6 * step));
+          if (body.angular.length() > .24) body.angular.setLength(.24);
+          body.object.rotateOnAxis(body.angular.clone().normalize(), body.angular.length() * step);
+        } else {
+          body.object.material.rotation += (body.spriteSpin + body.angular.z * .15) * step;
+        }
+        body.hit *= Math.pow(.02, step);
+        const pressedScale = groupPull ? (innerWidth < 640 ? .76 : .88) : (body === input.dragBody ? .94 : 1);
+        body.pressScale = THREE.MathUtils.lerp(body.pressScale, pressedScale, 1 - Math.exp(-10 * step));
+        const scale = (1 + body.hit * .18) * body.pressScale;
+        body.object.scale.copy(body.baseScale).multiplyScalar(scale);
+      }
+    }
+
+    let frameCount = 0, frameTime = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), .05);
+      const elapsed = clock.elapsedTime;
+      const frameScale = dt * 60;
+      for (const body of dynamic) {
+        if (body.type === "model") updateMaterialTransition(body, elapsed);
+      }
+      carouselAngle += (reduceMotion ? 0 : input.autoDirection * .22 * dt) + input.scrollPower * (Math.PI * 2 / 10) * frameScale;
+      if (Math.abs(input.scrollPower) > .0003) input.scrollPower *= Math.pow(.98, frameScale);
+      else input.scrollPower = 0;
+      camera.position.set(
+        input.hoverX * -.18,
+        Math.sin(carouselAngle) * 10 + input.hoverY * -.12,
+        Math.cos(carouselAngle) * 10
+      );
+      camera.up.set(0, Math.cos(carouselAngle), -Math.sin(carouselAngle));
+      camera.lookAt(cameraTarget);
+      world.rotation.set(0, 0, 0);
+      const scrollOnly = performance.now() < input.scrollPauseUntil || Math.abs(input.scrollPower) > .003;
+      if (scrollOnly) {
+        input.physicsBlend = .04;
+        if (!reduceMotion) simulate(dt * input.physicsBlend, elapsed);
+      } else {
+        input.physicsBlend = Math.min(1, input.physicsBlend + dt * .5);
+        if (!reduceMotion) simulate(dt * input.physicsBlend, elapsed);
+      }
+      const anchor = world.children.find(child => child.userData.anchor);
+      if (anchor) anchor.rotation.set(carouselAngle, -carouselAngle * .35, -carouselAngle * .25);
+      updateTeamPanelPosition();
+      renderer.render(scene, camera);
+
+      frameTime += dt;
+      frameCount++;
+      if (frameCount === 90) {
+        const average = frameTime / frameCount;
+        if (average > .021 && renderer.getPixelRatio() > 1) renderer.setPixelRatio(Math.max(1, renderer.getPixelRatio() - .25));
+        frameCount = 0;
+        frameTime = 0;
+      }
+    }
+
+    function resize() {
+      const aspect = innerWidth / innerHeight;
+      const viewHeight = innerWidth < 640 ? 11.2 : 8.3;
+      camera.left = -viewHeight * aspect / 2;
+      camera.right = viewHeight * aspect / 2;
+      camera.top = viewHeight / 2;
+      camera.bottom = -viewHeight / 2;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, renderer.getPixelRatio(), 1.7));
+      updateTeamPanelPosition();
+    }
+    addEventListener("resize", resize);
+    resize();
+    animate();
+  </script>
+</body>
+
+</html>

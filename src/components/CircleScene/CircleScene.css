@@ -1,0 +1,54 @@
+.circle-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.circle-scene {
+      --paper: #ffffff;
+      --paper-strong: #f2f2f2;
+      --ink: #0b0b0a;
+      --ink-soft: rgba(11, 11, 10, 0.62);
+      --ink-faint: rgba(11, 11, 10, 0.36);
+      --accent: #29e0c4;
+      --accent-strong: #0fb79d;
+      --accent-line: rgba(41, 224, 196, 0.62);
+      --accent-glow: rgba(41, 224, 196, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    .circle-scene {
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100%;
+      font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+      overflow: hidden;
+    }
+
+    .circle-scene .stage-wrap {
+      position: absolute;
+      inset: 0;
+    }
+
+    .circle-scene canvas#scene {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .circle-scene .vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      /* background:
+      radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 62%, rgba(11,11,10,0.035) 100%); */
+    }

@@ -1,0 +1,560 @@
+:root {
+      color-scheme: light;
+
+
+      /* HEADER */
+      --header-height: 80px;
+      --header-x: 25px;
+
+      /* HERO */
+      --hero-x: 28px;
+      --hero-gap: 12px;
+      --hero-bottom: 24px;
+      --hero-radius: 14px;
+
+      /* COLORS */
+      --ink: #0b0b0b;
+      --muted: #a0a0a0;
+      --line: #111111;
+      --paper: #ffffff;
+
+      --ease: cubic-bezier(.22, .61, .36, 1);
+    }
+
+
+    /* ========================================
+       RESET
+    ======================================== */
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body,
+    #root {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+
+      background: var(--paper);
+      color: var(--ink);
+
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .app-shell {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+
+    /* ========================================
+       HEADER
+    ======================================== */
+
+    .site-header {
+      position: fixed;
+
+      z-index: 20;
+
+      top: 0;
+      left: 0;
+      right: 0;
+
+      height: var(--header-height);
+
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      padding: 0 var(--header-x);
+
+      background: #ffffff;
+    }
+
+
+
+    /* ========================================
+       LOGO
+    ======================================== */
+
+    .brand {
+      display: flex;
+      align-items: center;
+
+      flex: 0 0 auto;
+
+      width: auto;
+      height: auto;
+
+      padding: 0;
+      margin: 0;
+
+      border: 0;
+      background: transparent;
+
+      overflow: visible;
+      text-decoration: none;
+    }
+
+    .brand img {
+      display: block;
+
+      /* 로고 크기 */
+      width: 130px;
+      height: 20px;
+      object-fit: contain;
+      overflow: visible;
+    }
+
+    .brand span {
+      position: absolute;
+
+      width: 1px;
+      height: 1px;
+
+      overflow: hidden;
+
+      clip: rect(0 0 0 0);
+
+      white-space: nowrap;
+    }
+
+
+    /* ========================================
+       HEADER RIGHT
+    ======================================== */
+
+    .menu-shell {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+
+      flex: 0 0 auto;
+
+      /*
+        CIRCLE pill과
+        메뉴 pill 사이 간격
+      */
+      gap: 14px;
+
+      height: 30px;
+
+      overflow: visible;
+    }
+
+
+    /* ========================================
+       공통 PILL
+    ======================================== */
+
+    .mode-button,
+    .nav-panel {
+      height: 30px;
+
+      border: 1px solid var(--line);
+      border-radius: 999px;
+
+      background: var(--paper);
+    }
+
+
+    /* ========================================
+       MODE PILL
+       [ CIRCLE ]
+    ======================================== */
+
+    .mode-button {
+      appearance: none;
+
+      flex: 0 0 auto;
+
+      width: auto;
+      min-width: 70px;
+
+      padding: 0 16px;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      color: var(--ink);
+      background: var(--paper);
+
+      border: 1px solid var(--line);
+      border-radius: 999px;
+
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10px;
+      font-weight: 400;
+      line-height: 1;
+
+      letter-spacing: 0;
+      text-transform: uppercase;
+
+      white-space: nowrap;
+
+      cursor: pointer;
+
+      transition:
+        background-color .24s ease,
+        color .24s ease;
+    }
+
+    .mode-button:hover {
+      background: var(--ink);
+      color: #ffffff;
+    }
+
+    /* OBJECT MODE */
+
+    .app-shell[data-mode="object"] .mode-button {
+      background: var(--ink);
+      color: #ffffff;
+    }
+
+    /* ========================================
+       MENU PILL
+
+       [ PROJECT   STUDENT   > ]
+    ======================================== */
+
+    .nav-panel {
+      flex: 0 0 235px;
+
+      width: 235px;
+
+      display: flex;
+      align-items: center;
+
+      overflow: hidden;
+
+
+      transition:
+        width .48s var(--ease),
+        flex-basis .48s var(--ease);
+    }
+
+
+    /* ========================================
+       EXPANDED MENU
+    ======================================== */
+
+    .app-shell.is-menu-expanded .nav-panel {
+      flex-basis: 620px;
+      width: 620px;
+    }
+
+
+    /* ========================================
+       NAV LIST
+    ======================================== */
+
+    .nav-list {
+      width: 100%;
+      height: 100%;
+
+      display: flex;
+      align-items: center;
+
+      padding: 0 4px 0 14px;
+
+      gap: 0;
+    }
+
+
+    /* ========================================
+       NAV BUTTONS
+    ======================================== */
+
+    .nav-item,
+    .arrow-button {
+      appearance: none;
+
+      border: 0;
+
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10px;
+      font-weight: 400;
+      line-height: 1;
+
+      letter-spacing: 0;
+
+      text-transform: uppercase;
+
+      white-space: nowrap;
+
+      cursor: pointer;
+    }
+
+
+    .nav-item {
+      flex: 0 0 auto;
+
+      height: 100%;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      padding: 0 16px;
+
+      color: var(--muted);
+
+      background: transparent;
+    }
+
+
+    /* ========================================
+       EXTRA MENU
+
+       CONTENT
+       GUESTBOOK
+       CURRICULUM
+       CREDIT
+    ======================================== */
+
+    .nav-extra {
+      max-width: 0;
+
+      padding-left: 0;
+      padding-right: 0;
+
+      opacity: 0;
+
+      overflow: hidden;
+
+      pointer-events: none;
+
+      transition:
+        max-width .42s var(--ease),
+        padding .42s var(--ease),
+        opacity .18s ease;
+    }
+
+
+    .app-shell.is-menu-expanded .nav-extra {
+      max-width: 120px;
+
+      padding-left: 16px;
+      padding-right: 16px;
+
+      opacity: 1;
+
+      pointer-events: auto;
+
+      transition:
+        max-width .48s var(--ease),
+        padding .48s var(--ease),
+        opacity .24s ease .14s;
+    }
+
+
+    /* ========================================
+       ARROW
+    ======================================== */
+
+    .arrow-button {
+      flex: 0 0 34px;
+
+      height: 100%;
+
+      margin-left: auto;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      padding: 0;
+
+      color: var(--ink);
+      background: transparent;
+
+      font-size: 13px;
+    }
+
+
+    /* ========================================
+       HERO
+    ======================================== */
+
+    .hero {
+      position: fixed;
+
+      top: calc(var(--header-height) + var(--hero-gap));
+
+      left: var(--hero-x);
+      right: var(--hero-x);
+
+      bottom: var(--hero-bottom);
+
+      background: #ffffff;
+
+      border-radius: var(--hero-radius);
+
+      overflow: hidden;
+
+    }
+
+
+    /* ========================================
+       CIRCLE / OBJECT SCENES
+    ======================================== */
+
+    .scene-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .34s ease;
+    }
+
+    .scene-layer.is-active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+
+    /* ========================================
+       RESPONSIVE
+    ======================================== */
+
+    @media (max-width: 900px) {
+
+      :root {
+        --header-x: 24px;
+
+        --hero-x: 20px;
+        --hero-bottom: 20px;
+      }
+
+      .brand img {
+        width: 115px;
+      }
+
+      .app-shell.is-menu-expanded .nav-panel {
+        flex-basis: 540px;
+        width: 540px;
+      }
+
+      .nav-item {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .app-shell.is-menu-expanded .nav-extra {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+    }
+
+
+    @media (max-width: 720px) {
+
+      :root {
+        --header-x: 18px;
+
+        --hero-x: 18px;
+        --hero-bottom: 18px;
+      }
+
+      .menu-shell {
+        gap: 8px;
+      }
+
+      .mode-button {
+        min-width: 62px;
+
+        padding-left: 11px;
+        padding-right: 11px;
+
+        font-size: 9px;
+      }
+
+      .nav-panel {
+        flex-basis: 190px;
+        width: 190px;
+      }
+
+      .app-shell.is-menu-expanded .nav-panel {
+        flex-basis: 450px;
+        width: 450px;
+      }
+
+      .nav-item {
+        padding-left: 8px;
+        padding-right: 8px;
+
+        font-size: 9px;
+      }
+
+      .app-shell.is-menu-expanded .nav-extra {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+    }
+
+
+    @media (max-width: 600px) {
+
+      :root {
+        --header-height: 64px;
+
+        --header-x: 14px;
+
+        --hero-x: 14px;
+        --hero-bottom: 14px;
+      }
+
+      .brand img {
+        width: 100px;
+      }
+
+      .mode-button,
+      .nav-panel {
+        height: 27px;
+      }
+
+      .mode-button {
+        min-width: 58px;
+
+        padding-left: 9px;
+        padding-right: 9px;
+
+        font-size: 8px;
+      }
+
+      .nav-panel {
+        flex-basis: 160px;
+        width: 160px;
+      }
+
+      .app-shell.is-menu-expanded .nav-panel {
+        flex-basis: 390px;
+        width: 390px;
+      }
+
+      .nav-item {
+        padding-left: 6px;
+        padding-right: 6px;
+
+        font-size: 8px;
+      }
+
+      .app-shell.is-menu-expanded .nav-extra {
+        padding-left: 6px;
+        padding-right: 6px;
+      }
+
+      .arrow-button {
+        flex-basis: 25px;
+      }
+    }

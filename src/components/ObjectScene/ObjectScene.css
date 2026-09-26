@@ -1,0 +1,120 @@
+.object-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.object-scene {
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    .object-scene {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    .object-scene {
+      background: #fff;
+      color: #111;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .object-scene canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .object-scene.is-pressing canvas {
+      cursor: grabbing;
+    }
+
+    .object-scene .loading {
+      position: absolute;
+      z-index: 2;
+      pointer-events: none;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: #fff;
+      color: #111;
+      text-transform: uppercase;
+      font-size: 11px;
+      line-height: 1;
+      transition: opacity .45s ease;
+    }
+
+    .object-scene .loading.is-hidden {
+      opacity: 0;
+    }
+
+    .object-scene .progress {
+      width: 72px;
+      height: 1px;
+      margin-top: 10px;
+      background: #d2d2ce;
+      overflow: hidden;
+    }
+
+    .object-scene .progress::after {
+      content: "";
+      display: block;
+      width: var(--progress, 0%);
+      height: 100%;
+      background: #111;
+      transition: width .2s ease;
+    }
+
+    .object-scene .team-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 3;
+      width: min(270px, calc(100vw - 32px));
+      padding: 18px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.359);
+      color: #111;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate3d(0, 0, 0);
+      transition: opacity .16s ease;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .object-scene .team-panel.is-open {
+      opacity: 1;
+    }
+
+    .object-scene .team-panel__team {
+      margin: 0 0 10px;
+      font-size: 13px;
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .object-scene .team-panel__media {
+      margin: 0 0 12px;
+      font-size: 12px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+
+    .object-scene .team-panel__description {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.55;
+      font-weight: 400;
+    }
