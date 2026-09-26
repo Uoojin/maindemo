@@ -3,11 +3,12 @@ import './Header.css';
 export default function Header({ mode, menuExpanded, onToggleMode, onToggleMenu }) {
   const extraTabIndex = menuExpanded ? 0 : -1;
   const extraHidden = menuExpanded ? 'false' : 'true';
+  const logoSrc = `${import.meta.env.BASE_URL}assets/SYNCOPATE_Logo.png`;
 
   return (
     <header className="site-header" aria-label="SYNCOPATE navigation">
       <a className="brand" href="#" aria-label="SYNCOPATE">
-        <img src="/assets/SYNCOPATE_Logo.png" alt="SYNCOPATE" />
+        <img src={logoSrc} alt="SYNCOPATE" />
         <span>SYNCOPATE</span>
       </a>
 

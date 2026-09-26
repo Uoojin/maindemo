@@ -122,7 +122,7 @@ export default function ObjectScene({ active }) {
             [-3.55, -2.15, -.45], [-1.4, -2.5, .85], [1.35, -2.45, -.85], [3.7, -2.1, .65],
             [-.2, 3.75, -1], [-.1, -3.65, .5], [-4.85, -1.05, -.65], [4.9, 1.05, -.45]
           ];
-          const assetPath = "./assets/";
+          const assetPath = `${import.meta.env.BASE_URL}assets/`;
           const modelFiles = ["shape.glb", "cone.glb", "capsulel.glb", "cube.glb", "bag.glb", "car.glb", "snekars.glb"];
           const imageFiles = Array.from({ length: 10 }, (_, i) => `image ${1300 + i}.webp`);
           const totalAssets = modelFiles.length + imageFiles.length;
