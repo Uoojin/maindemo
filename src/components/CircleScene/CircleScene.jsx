@@ -27,6 +27,11 @@ export default function CircleScene({ active }) {
             design: '#FFFBD2',
             programming: '#EBE6FF'
           };
+          var MAJOR_SYNC_COLORS = {
+            programming: '#8870FF',
+            planning: '#FF97E8',
+            design: '#FFF25D'
+          };
           var MAJORS = ['planning', 'design', 'programming'];
           var TEAM_COUNT = 17;
           var STUDENT_COUNT = 113;
@@ -1625,42 +1630,17 @@ export default function CircleScene({ active }) {
             ctx.beginPath();
             ctx.arc(sx, sy, rr, 0, Math.PI * 2);
             if (sv > 0) {
-              ctx.fillStyle = n.syncRole === 'source'
-                ? 'rgba(255,0,110,0.98)'
-                : 'rgba(0,220,255,0.98)';
+              ctx.fillStyle = MAJOR_SYNC_COLORS[n.major];
             } else {
               ctx.fillStyle = useMajorColor ? MAJOR_COLORS[n.major] : 'rgba(255,255,255,0.88)';
             }
             ctx.fill();
     
-            if (sv > 0) {
-              // Interaction is contained inside the original student circle.
-              ctx.save();
-              ctx.beginPath(); ctx.arc(sx, sy, rr, 0, Math.PI * 2); ctx.clip();
-              ctx.translate(sx, sy);
-              var dir = n.syncRole === 'source' ? 1 : -1;
-              ctx.rotate(t * 6.4 * dir + n.idx * .27);
-    
-              ctx.beginPath(); ctx.moveTo(0, 0);
-              ctx.arc(0, 0, rr * 1.08, -Math.PI * .48, Math.PI * .48);
-              ctx.closePath();
-              ctx.fillStyle = n.syncRole === 'source'
-                ? 'rgba(255,230,0,' + (0.88 * sv).toFixed(3) + ')'
-                : 'rgba(91,44,255,' + (0.94 * sv).toFixed(3) + ')';
-              ctx.fill();
-    
-              ctx.beginPath();
-              ctx.arc(rr * .35, 0, Math.max(1.2, rr * .20), 0, Math.PI * 2);
-              ctx.fillStyle = 'rgba(255,255,255,' + (0.92 * sv).toFixed(3) + ')';
-              ctx.fill();
-              ctx.restore();
-            }
-    
             ctx.strokeStyle = sv > 0
-              ? (n.syncRole === 'source' ? 'rgba(255,0,110,0.98)' : 'rgba(0,180,155,0.98)')
+              ? MAJOR_SYNC_COLORS[n.major]
               : (useMajorColor ? hexToRgba(MAJOR_COLORS[n.major], 0.92) :
                 (isActiveTeam ? 'rgba(41,224,196,0.52)' : 'rgba(20,20,20,0.26)'));
-            ctx.lineWidth = sv > 0 ? 1.5 : (useMajorColor ? 1.1 : 0.8);
+            ctx.lineWidth = sv > 0 ? 1.35 : (useMajorColor ? 1.1 : 0.8);
             ctx.stroke();
             ctx.restore();
     
